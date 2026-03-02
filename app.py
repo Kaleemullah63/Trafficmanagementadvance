@@ -4,9 +4,9 @@ from collections import deque
 from groq import Groq
 import random
 
-# ==================================================
+# ==============================
 # Page Config
-# ==================================================
+# ==============================
 st.set_page_config(
     page_title="Worldwide AI Traffic Route Prediction",
     layout="wide"
@@ -14,9 +14,9 @@ st.set_page_config(
 
 GROQ_API_KEY = "API_KEY"
 
-# ==================================================
+# ==============================
 # UI Style
-# ==================================================
+# ==============================
 st.markdown("""
 <style>
 body {
@@ -32,29 +32,30 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# ==================================================
-# Country → City → Waypoints (city-specific accurate sample)
-# ==================================================
-CITY_WAYPOINTS = {
-    "Multan": ["Gulgasht", "9 Number Chowk", "Kumharawala Chowk", "Vehari Chowk", "Dolat Gate", "BCG Chowk", "Market Road", "Station Chowk"],
-    "Lahore": ["Model Town", "Shadman", "Ferozepur Road", "Township", "Shalimar", "Gulberg", "Liberty Market", "Iqbal Town"],
-    "Karachi": ["Clifton", "Saddar", "Gulshan-e-Iqbal", "Korangi", "North Nazimabad", "Malir", "PECHS", "Bahadurabad"],
-    "Delhi": ["Connaught Place", "Karol Bagh", "Rajouri Garden", "Hauz Khas", "Lajpat Nagar", "Vasant Kunj", "Saket", "Dwarka"],
-    "Mumbai": ["Andheri", "Bandra", "Juhu", "Dadar", "Colaba", "Fort", "Kurla", "Malad"],
-    "New York": ["Manhattan", "Brooklyn", "Queens", "Bronx", "Harlem", "Chelsea", "Times Square", "Central Park"],
-    "London": ["Camden", "Soho", "Greenwich", "Chelsea", "Kensington", "Shoreditch", "Mayfair", "Notting Hill"]
-}
-
+# ==============================
+# Sample Country → Cities → City-specific waypoints
+# (Representative Example)
+# ==============================
 COUNTRY_CITY_MAP = {
-    "Pakistan": ["Multan","Lahore","Karachi"],
-    "India": ["Delhi","Mumbai"],
-    "United States": ["New York"],
-    "United Kingdom": ["London"]
+    "Pakistan": ["Karachi", "Lahore", "Islamabad", "Multan", "Faisalabad", "Rawalpindi", "Quetta"],
+    "India": ["Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad", "Kolkata", "Pune"],
+    "United States": ["New York", "Los Angeles", "Chicago", "Houston", "San Francisco", "Seattle", "Miami"],
+    "United Kingdom": ["London", "Manchester", "Birmingham", "Leeds", "Liverpool", "Glasgow", "Edinburgh"]
 }
 
-# ==================================================
+CITY_WAYPOINTS = {
+    "Karachi": ["Clifton", "Saddar", "Gulshan-e-Iqbal", "Korangi", "North Nazimabad", "Malir", "PECHS", "Bahadurabad", "Airport Road", "Sea View", "Karachi Cantt"],
+    "Lahore": ["Model Town", "Shadman", "Ferozepur Road", "Township", "Shalimar", "Gulberg", "Liberty Market", "Iqbal Town", "Railway Station", "Anarkali"],
+    "Islamabad": ["F-6", "F-7", "F-8", "F-9", "Blue Area", "G-6", "G-7", "G-8", "Airport", "Rawal Lake"],
+    "Delhi": ["Connaught Place", "Karol Bagh", "Rajouri Garden", "Hauz Khas", "Lajpat Nagar", "Vasant Kunj", "Saket", "Dwarka", "IGI Airport", "India Gate"],
+    "Mumbai": ["Andheri", "Bandra", "Juhu", "Dadar", "Colaba", "Fort", "Kurla", "Malad", "BKC", "CST Station"],
+    "New York": ["Manhattan", "Brooklyn", "Queens", "Bronx", "Harlem", "Chelsea", "Times Square", "Central Park", "JFK Airport", "Wall Street"],
+    "London": ["Camden", "Soho", "Greenwich", "Chelsea", "Kensington", "Shoreditch", "Mayfair", "Notting Hill", "Heathrow", "King's Cross"]
+}
+
+# ==============================
 # Traffic Estimation
-# ==================================================
+# ==============================
 def estimate_traffic(distance, time_type, weather):
     base = distance * 15
     time_mul = 1.5 if time_type=="Peak" else 1.0
@@ -71,9 +72,9 @@ def congestion_percentage(cars):
     else:
         return percent,"High","🔴"
 
-# ==================================================
+# ==============================
 # Dynamic Graph / Route Generation
-# ==================================================
+# ==============================
 def generate_graph(waypoints):
     edges = {}
     for i in range(len(waypoints)-1):
@@ -99,9 +100,9 @@ def find_routes(graph, start, end, max_paths=3):
                     queue.append(path+[n])
     return routes
 
-# ==================================================
+# ==============================
 # AI Suggestions
-# ==================================================
+# ==============================
 def ai_suggestions(prompt):
     try:
         client = Groq(api_key=GROQ_API_KEY)
@@ -113,10 +114,10 @@ def ai_suggestions(prompt):
     except:
         return "AI service unavailable."
 
-# ==================================================
+# ==============================
 # UI
-# ==================================================
-st.title("🚦 Worldwide Dynamic AI Traffic & Route Prediction")
+# ==============================
+st.title("🚦 Worldwide AI Traffic Route Prediction")
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 

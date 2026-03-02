@@ -6,17 +6,14 @@ from groq import Groq
 # PAGE CONFIG
 # ==================================================
 st.set_page_config(
-    page_title="AI Traffic & Route Prediction System",
+    page_title="AI Traffic Route Prediction",
     layout="wide"
 )
 
-# ==================================================
-# API KEY
-# ==================================================
 GROQ_API_KEY = "API_KEY"
 
 # ==================================================
-# MODERN UI STYLE
+# UI STYLE
 # ==================================================
 st.markdown("""
 <style>
@@ -34,178 +31,134 @@ body {
 """, unsafe_allow_html=True)
 
 # ==================================================
-# WORLDWIDE COUNTRY → CITY DATA (≈30 CITIES EACH)
+# COUNTRY → CITY LIST (EXTENSIBLE)
 # ==================================================
 COUNTRY_CITY_MAP = {
     "Pakistan": [
-        "Karachi","Lahore","Islamabad","Rawalpindi","Multan","Faisalabad",
-        "Gujranwala","Sialkot","Bahawalpur","Sargodha","Sheikhupura",
-        "Rahim Yar Khan","Okara","Mardan","Swat","Abbottabad",
-        "Peshawar","Quetta","Hyderabad","Sukkur","Larkana",
-        "Mirpur","Muzaffarabad","Chaman","Khuzdar","Gwadar",
-        "Kasur","Vehari","Dera Ghazi Khan"
+        "Multan","Lahore","Karachi","Islamabad","Faisalabad",
+        "Rawalpindi","Gujranwala","Sialkot","Bahawalpur","Rahim Yar Khan"
     ],
-
     "India": [
-        "Delhi","Mumbai","Bangalore","Chennai","Hyderabad","Kolkata",
-        "Pune","Ahmedabad","Surat","Jaipur","Udaipur","Jodhpur",
-        "Indore","Bhopal","Gwalior","Kanpur","Lucknow","Varanasi",
-        "Patna","Ranchi","Bhubaneswar","Cuttack","Vijayawada",
-        "Visakhapatnam","Tirupati","Madurai","Trichy","Coimbatore",
-        "Salem","Erode"
+        "Delhi","Mumbai","Bangalore","Chennai","Hyderabad",
+        "Pune","Ahmedabad","Jaipur","Indore","Bhopal"
     ],
-
     "United States": [
-        "New York","Los Angeles","Chicago","Houston","Phoenix","San Diego",
-        "Dallas","Austin","San Antonio","San Jose","San Francisco",
-        "Seattle","Portland","Denver","Boulder","Las Vegas","Reno",
-        "Salt Lake City","Miami","Orlando","Tampa","Atlanta","Savannah",
-        "Boston","Cambridge","New Haven","Hartford","Newark","Jersey City",
-        "Hoboken"
+        "New York","Los Angeles","Chicago","Houston","Phoenix",
+        "Dallas","Austin","San Jose","San Francisco","Seattle"
     ],
-
     "United Kingdom": [
-        "London","Manchester","Birmingham","Leeds","Liverpool","Sheffield",
-        "Nottingham","Derby","Leicester","Coventry","Oxford","Cambridge",
-        "Milton Keynes","Reading","Slough","Windsor","Bristol","Bath",
-        "Cardiff","Newport","Swansea","Edinburgh","Glasgow","Dundee",
-        "Aberdeen","Inverness","Perth","Stirling","Falkirk","Paisley"
+        "London","Manchester","Birmingham","Leeds","Liverpool",
+        "Sheffield","Nottingham","Derby","Leicester","Coventry"
     ]
 }
 
-LOCATION_TYPES = ["Downtown", "Highway", "Residential", "School Zone", "IT Park"]
-
 # ==================================================
-# TRAFFIC ESTIMATION (SYSTEM BASED)
+# TRAFFIC ESTIMATION (SYSTEM)
 # ==================================================
-def estimate_traffic(location_type, time_type, weather):
-    base = {
-        "Downtown": (120, 60, 25),
-        "Highway": (180, 40, 35),
-        "Residential": (70, 50, 10),
-        "School Zone": (60, 30, 15),
-        "IT Park": (100, 50, 20)
-    }
-
+def estimate_traffic(time_type, weather):
+    base_cars = 120
     time_mul = 1.5 if time_type == "Peak" else 1.0
     weather_mul = {"Clear":1.0, "Rainy":1.2, "Foggy":1.3}[weather]
-
-    cars, bikes, buses = base[location_type]
-
-    return (
-        int(cars * time_mul * weather_mul),
-        int(bikes * time_mul * weather_mul),
-        int(buses * time_mul * weather_mul)
-    )
+    cars = int(base_cars * time_mul * weather_mul)
+    return cars
 
 # ==================================================
-# CONGESTION LOGIC
+# CONGESTION CALCULATION
 # ==================================================
-def congestion_score(cars, bikes, buses, location_type):
-    weight = {
-        "Downtown":1.4,
-        "Highway":1.2,
-        "Residential":1.0,
-        "School Zone":1.3,
-        "IT Park":1.2
-    }
-    return (cars + bikes*0.5 + buses*2.5) * weight[location_type]
-
-def classify(score):
-    if score < 120:
-        return "Low", "🟢", 5
-    elif score < 220:
-        return "Medium", "🟠", 15
+def congestion_percentage(cars):
+    percent = min(100, int((cars / 250) * 100))
+    if percent < 40:
+        return percent, "Low", "🟢"
+    elif percent < 70:
+        return percent, "Medium", "🟠"
     else:
-        return "High", "🔴", 30
+        return percent, "High", "🔴"
 
 # ==================================================
-# ROUTE GENERATION (GENERIC FOR ANY CITY)
+# REALISTIC ROUTE GENERATION
 # ==================================================
-def generate_routes(source, destination):
+def generate_named_routes(source, destination):
     return [
-        {"name": f"{source} → Main Road → {destination}", "type":"Downtown"},
-        {"name": f"{source} → Ring Road → {destination}", "type":"Highway"},
-        {"name": f"{source} → Local Streets → {destination}", "type":"Residential"}
+        {
+            "path": f"{source} → 9 Number Chowk → Kumharawala Chowk → {destination}",
+            "distance": 6.8
+        },
+        {
+            "path": f"{source} → Dault Gate → BCG Chowk → {destination}",
+            "distance": 7.5
+        },
+        {
+            "path": f"{source} → Internal Streets → Market Road → {destination}",
+            "distance": 5.9
+        }
     ]
 
 # ==================================================
 # AI SUGGESTIONS
 # ==================================================
-def ai_advice(prompt):
+def ai_suggestions(text):
     try:
         client = Groq(api_key=GROQ_API_KEY)
         res = client.chat.completions.create(
             model="llama3-8b-8192",
-            messages=[{"role":"user","content":prompt}]
+            messages=[{"role":"user","content":text}]
         )
         return res.choices[0].message.content
     except:
-        return "AI service unavailable."
+        return "AI suggestions currently unavailable."
 
 # ==================================================
 # UI
 # ==================================================
-st.title("🚦 AI Traffic Congestion & Route Recommendation System")
+st.title("🚦 AI Traffic Route & Congestion Prediction")
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
 country = st.selectbox("🌍 Country", list(COUNTRY_CITY_MAP.keys()))
 city = st.selectbox("🏙 City", COUNTRY_CITY_MAP[country])
 
-source = st.text_input("🚩 Source Area (street / colony / sector)")
-destination = st.text_input("🏁 Destination Area")
+source = st.text_input("🚩 Source Area (e.g. Gulgasht Colony)")
+destination = st.text_input("🏁 Destination Area (e.g. Vehari Chowk)")
 
-location_type = st.selectbox("📍 Area Type", LOCATION_TYPES)
 time_type = st.radio("⏰ Time", ["Peak", "Non-Peak"])
 weather = st.selectbox("🌦 Weather", ["Clear", "Rainy", "Foggy"])
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ==================================================
-# PREDICTION
+# PROCESS
 # ==================================================
-if st.button("🔍 Find Best Route") and source and destination:
-    with st.spinner("Analyzing routes..."):
+if st.button("🔍 Show Routes") and source and destination:
+    with st.spinner("Analyzing traffic conditions..."):
         time.sleep(1)
 
-        routes = generate_routes(source, destination)
-        best_route = None
-        best_score = float("inf")
+        cars = estimate_traffic(time_type, weather)
+        percent, level, icon = congestion_percentage(cars)
 
-        st.subheader("🛣 Alternative Routes")
+        routes = generate_named_routes(source, destination)
+
+        st.subheader("🛣 Available Routes")
 
         for r in routes:
-            cars, bikes, buses = estimate_traffic(
-                r["type"], time_type, weather
-            )
-
-            score = congestion_score(cars, bikes, buses, r["type"])
-            level, icon, delay = classify(score)
-
-            if score < best_score:
-                best_score = score
-                best_route = r["name"]
+            avg_speed = 25 if level == "High" else 35 if level == "Medium" else 45
+            time_min = int((r["distance"] / avg_speed) * 60)
 
             st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.write(f"**Route:** {r['name']}")
-            st.write(f"Traffic: {icon} {level}")
-            st.write(f"Estimated Delay: {delay} minutes")
+            st.write(f"**Route:** {r['path']}")
+            st.write(f"📏 Distance: **{r['distance']} km**")
+            st.write(f"⏱ Estimated Time: **{time_min} minutes**")
+            st.write(f"🚦 Congestion: **{percent}% {icon} ({level})**")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        st.success(f"✅ Recommended Route (Lowest Congestion): **{best_route}**")
-
         prompt = f"""
-        Country: {country}
         City: {city}
-        Best Route: {best_route}
         Time: {time_type}
         Weather: {weather}
-
-        Suggest traffic improvements and alternative travel advice.
+        Routes analyzed between {source} and {destination}.
+        Provide traffic management and travel advice.
         """
 
-        st.subheader("🤖 AI Suggestions")
+        st.subheader("🤖 AI Traffic Insights")
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.write(ai_advice(prompt))
+        st.write(ai_suggestions(prompt))
         st.markdown('</div>', unsafe_allow_html=True)

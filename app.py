@@ -1,18 +1,22 @@
 import streamlit as st
 import time
-from groq import Groq
 from collections import deque
+from groq import Groq
+import random
 
-# ==================================================
-# PAGE CONFIG
-# ==================================================
-st.set_page_config(page_title="Dynamic AI Traffic Route Prediction", layout="wide")
+# ==============================
+# Page Config
+# ==============================
+st.set_page_config(
+    page_title="Worldwide AI Traffic Route Prediction",
+    layout="wide"
+)
 
 GROQ_API_KEY = "API_KEY"
 
-# ==================================================
-# UI STYLE
-# ==================================================
+# ==============================
+# UI Style
+# ==============================
 st.markdown("""
 <style>
 body {
@@ -28,44 +32,30 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# ==================================================
-# COUNTRY → CITY → ROAD NETWORK (Graph)
-# Each city has nodes (areas/chowks) and edges (roads with distance)
-# ==================================================
-CITY_ROADS = {
-    "Multan": {
-        "nodes": ["Gulgasht", "9 Number Chowk", "Kumharawala Chowk", "Vehari Chowk", "Dolat Gate", "BCG Chowk"],
-        "edges": {
-            ("Gulgasht", "9 Number Chowk"): 2.0,
-            ("9 Number Chowk", "Kumharawala Chowk"): 1.5,
-            ("Kumharawala Chowk", "Vehari Chowk"): 3.0,
-            ("Gulgasht", "Dolat Gate"): 2.2,
-            ("Dolat Gate", "BCG Chowk"): 1.8,
-            ("BCG Chowk", "Vehari Chowk"): 3.2,
-            ("Gulgasht", "Vehari Chowk"): 6.0
-        }
-    },
-    "Lahore": {
-        "nodes": ["Model Town", "Shadman", "Ferozepur Road", "Township", "Shalimar", "Gulberg"],
-        "edges": {
-            ("Model Town", "Shadman"): 3.0,
-            ("Shadman", "Ferozepur Road"): 2.5,
-            ("Ferozepur Road", "Township"): 4.0,
-            ("Township", "Shalimar"): 3.5,
-            ("Shalimar", "Gulberg"): 2.8,
-            ("Model Town", "Gulberg"): 8.0
-        }
-    }
+# ==============================
+# Worldwide cities (sample ~30 per country)
+# ==============================
+COUNTRY_CITY_MAP = {
+    "Pakistan":["Karachi","Lahore","Islamabad","Rawalpindi","Multan","Faisalabad","Gujranwala","Sialkot","Bahawalpur","Sargodha","Sheikhupura","Rahim Yar Khan","Okara","Mardan","Swat","Abbottabad","Peshawar","Quetta","Hyderabad","Sukkur","Larkana","Mirpur","Muzaffarabad","Chaman","Khuzdar","Gwadar","Kasur","Vehari","Dera Ghazi Khan","Sahiwal"],
+    "India":["Delhi","Mumbai","Bangalore","Chennai","Hyderabad","Kolkata","Pune","Ahmedabad","Surat","Jaipur","Udaipur","Jodhpur","Indore","Bhopal","Gwalior","Kanpur","Lucknow","Varanasi","Patna","Ranchi","Bhubaneswar","Cuttack","Vijayawada","Visakhapatnam","Tirupati","Madurai","Trichy","Coimbatore","Salem","Erode"],
+    "United States":["New York","Los Angeles","Chicago","Houston","Phoenix","San Diego","Dallas","Austin","San Antonio","San Jose","San Francisco","Seattle","Portland","Denver","Miami","Orlando","Tampa","Atlanta","Boston","Cambridge","Newark","Hoboken","Las Vegas","Reno","Salt Lake City","Philadelphia","Baltimore","Charlotte","Nashville","Austin"],
+    "United Kingdom":["London","Manchester","Birmingham","Leeds","Liverpool","Sheffield","Nottingham","Derby","Leicester","Coventry","Oxford","Cambridge","Milton Keynes","Reading","Slough","Windsor","Bristol","Bath","Cardiff","Newport","Swansea","Edinburgh","Glasgow","Dundee","Aberdeen","Inverness","Perth","Stirling","Falkirk","Paisley"]
 }
 
-# ==================================================
-# TRAFFIC ESTIMATION (SYSTEM)
-# ==================================================
+# ==============================
+# Sample waypoints for simulation
+# ==============================
+SAMPLE_WAYPOINTS = ["Central", "9 Number Chowk", "Kumharawala Chowk", "Vehari Chowk", "Dolat Gate", "BCG Chowk",
+                    "Market Road", "Station Chowk", "Airport Road", "Ring Road", "University", "Hospital", "Mall", "Garden", "Bridge"]
+
+# ==============================
+# Traffic Estimation
+# ==============================
 def estimate_traffic(distance, time_type, weather):
-    base_cars = distance * 20  # cars per km
+    base = distance * 15
     time_mul = 1.5 if time_type=="Peak" else 1.0
     weather_mul = {"Clear":1.0,"Rainy":1.2,"Foggy":1.3}[weather]
-    cars = int(base_cars * time_mul * weather_mul)
+    cars = int(base*time_mul*weather_mul)
     return cars
 
 def congestion_percentage(cars):
@@ -77,28 +67,40 @@ def congestion_percentage(cars):
     else:
         return percent,"High","🔴"
 
-# ==================================================
-# FIND ROUTES USING BFS (ALTERNATIVE PATHS)
-# ==================================================
+# ==============================
+# Dynamic Route Generation
+# BFS to find multiple paths
+# ==============================
+def generate_simulated_graph(waypoints):
+    edges = {}
+    for i in range(len(waypoints)-1):
+        # connect sequentially
+        edges[(waypoints[i], waypoints[i+1])] = random.uniform(1.0,3.5)
+    # random cross connections
+    for _ in range(5):
+        a,b = random.sample(waypoints,2)
+        if a!=b and (a,b) not in edges and (b,a) not in edges:
+            edges[(a,b)] = random.uniform(1.0,4.0)
+    return edges
+
 def find_routes(graph, start, end, max_paths=3):
     queue = deque([[start]])
     routes = []
-
     while queue and len(routes)<max_paths:
         path = queue.popleft()
-        last_node = path[-1]
-        if last_node == end:
+        last = path[-1]
+        if last==end:
             routes.append(path)
         else:
-            neighbors = [b for (a,b) in graph if a==last_node] + [a for (a,b) in graph if b==last_node]
+            neighbors = [b for (a,b) in graph if a==last] + [a for (a,b) in graph if b==last]
             for n in neighbors:
                 if n not in path:
-                    queue.append(path + [n])
+                    queue.append(path+[n])
     return routes
 
-# ==================================================
-# AI SUGGESTIONS
-# ==================================================
+# ==============================
+# AI Suggestions
+# ==============================
 def ai_suggestions(prompt):
     try:
         client = Groq(api_key=GROQ_API_KEY)
@@ -110,57 +112,64 @@ def ai_suggestions(prompt):
     except:
         return "AI service unavailable."
 
-# ==================================================
+# ==============================
 # UI
-# ==================================================
-st.title("🚦 Dynamic AI Traffic & Route Prediction System")
+# ==============================
+st.title("🚦 Worldwide Dynamic AI Traffic & Route Prediction")
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
-city = st.selectbox("🏙 City", list(CITY_ROADS.keys()))
-nodes = CITY_ROADS[city]["nodes"]
-edges = CITY_ROADS[city]["edges"]
+country = st.selectbox("🌍 Country", list(COUNTRY_CITY_MAP.keys()))
+city = st.selectbox("🏙 City", COUNTRY_CITY_MAP[country])
 
-source = st.selectbox("🚩 Source", nodes)
-destination = st.selectbox("🏁 Destination", [n for n in nodes if n!=source])
+source = st.text_input("🚩 Source Location")
+destination = st.text_input("🏁 Destination Location")
 
 time_type = st.radio("⏰ Time", ["Peak","Non-Peak"])
 weather = st.selectbox("🌦 Weather", ["Clear","Rainy","Foggy"])
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-if st.button("🔍 Show Routes"):
-    with st.spinner("Calculating routes..."):
+if st.button("🔍 Generate Routes") and source and destination:
+    with st.spinner("Generating routes..."):
         time.sleep(1)
-        routes = find_routes(edges, source, destination, max_paths=3)
-        route_info = []
+        waypoints = random.sample(SAMPLE_WAYPOINTS,8)
+        # ensure source/destination included
+        if source not in waypoints: waypoints[0]=source
+        if destination not in waypoints: waypoints[-1]=destination
+
+        graph = generate_simulated_graph(waypoints)
+        routes = find_routes(graph, source, destination, max_paths=3)
 
         st.subheader("🛣 Alternative Routes")
 
+        route_info = []
+
         for path in routes:
-            total_distance = 0
-            segments = []
+            segments=[]
+            total_distance=0
             for i in range(len(path)-1):
                 a,b = path[i], path[i+1]
-                dist = edges.get((a,b)) or edges.get((b,a))
-                total_distance += dist
-                cars = estimate_traffic(dist, time_type, weather)
-                percent, level, icon = congestion_percentage(cars)
+                dist = graph.get((a,b)) or graph.get((b,a)) or random.uniform(1.0,4.0)
+                total_distance+=dist
+                cars = estimate_traffic(dist,time_type,weather)
+                percent,level,icon = congestion_percentage(cars)
                 segments.append({
-                    "segment": f"{a} → {b}",
-                    "distance": dist,
-                    "time": int(dist*2),  # minutes approximation
-                    "congestion": f"{percent}% {icon} ({level})"
+                    "segment":f"{a} → {b}",
+                    "distance":round(dist,2),
+                    "time":int(dist*2),
+                    "congestion":f"{percent}% {icon} ({level})"
                 })
-            route_info.append({"path":path, "segments":segments, "total_distance":total_distance})
+            route_info.append({"path":path,"segments":segments,"total_distance":round(total_distance,2)})
 
-        best_route = min(route_info, key=lambda x: sum([int(s['congestion'].split('%')[0]) for s in x['segments']]))
+        # Best route = lowest sum congestion %
+        best_route = min(route_info,key=lambda x: sum([int(s['congestion'].split('%')[0]) for s in x['segments']]))
 
         for r in route_info:
             st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.write("Route Waypoints: ", " → ".join(r["path"]))
+            st.write("Waypoints: ", " → ".join(r["path"]))
             st.write(f"Total Distance: {r['total_distance']} km")
-            total_time = sum([s["time"] for s in r["segments"]])
+            total_time=sum([s['time'] for s in r['segments']])
             st.write(f"Estimated Time: {total_time} minutes")
             st.subheader("Segments:")
             for s in r["segments"]:
@@ -169,8 +178,7 @@ if st.button("🔍 Show Routes"):
                 st.success("✅ Recommended Route (Lowest Congestion)")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # AI Suggestions
-        prompt = f"City: {city}, Source: {source}, Destination: {destination}, Time: {time_type}, Weather: {weather}. Suggest traffic improvements and alternative paths."
+        prompt = f"City: {city}, Source: {source}, Destination: {destination}, Time: {time_type}, Weather: {weather}. Provide traffic improvement suggestions and alternative path advice."
         st.subheader("🤖 AI Suggestions")
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.write(ai_suggestions(prompt))

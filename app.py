@@ -4,9 +4,9 @@ from collections import deque
 from groq import Groq
 import random
 
-# ==============================
+# ==================================================
 # Page Config
-# ==============================
+# ==================================================
 st.set_page_config(
     page_title="Worldwide AI Traffic Route Prediction",
     layout="wide"
@@ -14,9 +14,9 @@ st.set_page_config(
 
 GROQ_API_KEY = "API_KEY"
 
-# ==============================
+# ==================================================
 # UI Style
-# ==============================
+# ==================================================
 st.markdown("""
 <style>
 body {
@@ -32,25 +32,29 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# ==============================
-# Worldwide cities (sample ~30 per country)
-# ==============================
-COUNTRY_CITY_MAP = {
-    "Pakistan":["Karachi","Lahore","Islamabad","Rawalpindi","Multan","Faisalabad","Gujranwala","Sialkot","Bahawalpur","Sargodha","Sheikhupura","Rahim Yar Khan","Okara","Mardan","Swat","Abbottabad","Peshawar","Quetta","Hyderabad","Sukkur","Larkana","Mirpur","Muzaffarabad","Chaman","Khuzdar","Gwadar","Kasur","Vehari","Dera Ghazi Khan","Sahiwal"],
-    "India":["Delhi","Mumbai","Bangalore","Chennai","Hyderabad","Kolkata","Pune","Ahmedabad","Surat","Jaipur","Udaipur","Jodhpur","Indore","Bhopal","Gwalior","Kanpur","Lucknow","Varanasi","Patna","Ranchi","Bhubaneswar","Cuttack","Vijayawada","Visakhapatnam","Tirupati","Madurai","Trichy","Coimbatore","Salem","Erode"],
-    "United States":["New York","Los Angeles","Chicago","Houston","Phoenix","San Diego","Dallas","Austin","San Antonio","San Jose","San Francisco","Seattle","Portland","Denver","Miami","Orlando","Tampa","Atlanta","Boston","Cambridge","Newark","Hoboken","Las Vegas","Reno","Salt Lake City","Philadelphia","Baltimore","Charlotte","Nashville","Austin"],
-    "United Kingdom":["London","Manchester","Birmingham","Leeds","Liverpool","Sheffield","Nottingham","Derby","Leicester","Coventry","Oxford","Cambridge","Milton Keynes","Reading","Slough","Windsor","Bristol","Bath","Cardiff","Newport","Swansea","Edinburgh","Glasgow","Dundee","Aberdeen","Inverness","Perth","Stirling","Falkirk","Paisley"]
+# ==================================================
+# Country → City → Waypoints (city-specific accurate sample)
+# ==================================================
+CITY_WAYPOINTS = {
+    "Multan": ["Gulgasht", "9 Number Chowk", "Kumharawala Chowk", "Vehari Chowk", "Dolat Gate", "BCG Chowk", "Market Road", "Station Chowk"],
+    "Lahore": ["Model Town", "Shadman", "Ferozepur Road", "Township", "Shalimar", "Gulberg", "Liberty Market", "Iqbal Town"],
+    "Karachi": ["Clifton", "Saddar", "Gulshan-e-Iqbal", "Korangi", "North Nazimabad", "Malir", "PECHS", "Bahadurabad"],
+    "Delhi": ["Connaught Place", "Karol Bagh", "Rajouri Garden", "Hauz Khas", "Lajpat Nagar", "Vasant Kunj", "Saket", "Dwarka"],
+    "Mumbai": ["Andheri", "Bandra", "Juhu", "Dadar", "Colaba", "Fort", "Kurla", "Malad"],
+    "New York": ["Manhattan", "Brooklyn", "Queens", "Bronx", "Harlem", "Chelsea", "Times Square", "Central Park"],
+    "London": ["Camden", "Soho", "Greenwich", "Chelsea", "Kensington", "Shoreditch", "Mayfair", "Notting Hill"]
 }
 
-# ==============================
-# Sample waypoints for simulation
-# ==============================
-SAMPLE_WAYPOINTS = ["Central", "9 Number Chowk", "Kumharawala Chowk", "Vehari Chowk", "Dolat Gate", "BCG Chowk",
-                    "Market Road", "Station Chowk", "Airport Road", "Ring Road", "University", "Hospital", "Mall", "Garden", "Bridge"]
+COUNTRY_CITY_MAP = {
+    "Pakistan": ["Multan","Lahore","Karachi"],
+    "India": ["Delhi","Mumbai"],
+    "United States": ["New York"],
+    "United Kingdom": ["London"]
+}
 
-# ==============================
+# ==================================================
 # Traffic Estimation
-# ==============================
+# ==================================================
 def estimate_traffic(distance, time_type, weather):
     base = distance * 15
     time_mul = 1.5 if time_type=="Peak" else 1.0
@@ -67,20 +71,17 @@ def congestion_percentage(cars):
     else:
         return percent,"High","🔴"
 
-# ==============================
-# Dynamic Route Generation
-# BFS to find multiple paths
-# ==============================
-def generate_simulated_graph(waypoints):
+# ==================================================
+# Dynamic Graph / Route Generation
+# ==================================================
+def generate_graph(waypoints):
     edges = {}
     for i in range(len(waypoints)-1):
-        # connect sequentially
-        edges[(waypoints[i], waypoints[i+1])] = random.uniform(1.0,3.5)
-    # random cross connections
+        edges[(waypoints[i], waypoints[i+1])] = round(random.uniform(1.0,3.5),2)
     for _ in range(5):
         a,b = random.sample(waypoints,2)
         if a!=b and (a,b) not in edges and (b,a) not in edges:
-            edges[(a,b)] = random.uniform(1.0,4.0)
+            edges[(a,b)] = round(random.uniform(1.0,4.0),2)
     return edges
 
 def find_routes(graph, start, end, max_paths=3):
@@ -98,9 +99,9 @@ def find_routes(graph, start, end, max_paths=3):
                     queue.append(path+[n])
     return routes
 
-# ==============================
+# ==================================================
 # AI Suggestions
-# ==============================
+# ==================================================
 def ai_suggestions(prompt):
     try:
         client = Groq(api_key=GROQ_API_KEY)
@@ -112,9 +113,9 @@ def ai_suggestions(prompt):
     except:
         return "AI service unavailable."
 
-# ==============================
+# ==================================================
 # UI
-# ==============================
+# ==================================================
 st.title("🚦 Worldwide Dynamic AI Traffic & Route Prediction")
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -133,16 +134,14 @@ st.markdown('</div>', unsafe_allow_html=True)
 if st.button("🔍 Generate Routes") and source and destination:
     with st.spinner("Generating routes..."):
         time.sleep(1)
-        waypoints = random.sample(SAMPLE_WAYPOINTS,8)
-        # ensure source/destination included
+        waypoints = CITY_WAYPOINTS.get(city, ["Central","Main Chowk","Station","Market","Hospital","Mall","Bridge","Park"])
         if source not in waypoints: waypoints[0]=source
         if destination not in waypoints: waypoints[-1]=destination
 
-        graph = generate_simulated_graph(waypoints)
+        graph = generate_graph(waypoints)
         routes = find_routes(graph, source, destination, max_paths=3)
 
         st.subheader("🛣 Alternative Routes")
-
         route_info = []
 
         for path in routes:
@@ -150,7 +149,7 @@ if st.button("🔍 Generate Routes") and source and destination:
             total_distance=0
             for i in range(len(path)-1):
                 a,b = path[i], path[i+1]
-                dist = graph.get((a,b)) or graph.get((b,a)) or random.uniform(1.0,4.0)
+                dist = graph.get((a,b)) or graph.get((b,a)) or round(random.uniform(1.0,4.0),2)
                 total_distance+=dist
                 cars = estimate_traffic(dist,time_type,weather)
                 percent,level,icon = congestion_percentage(cars)
@@ -162,7 +161,6 @@ if st.button("🔍 Generate Routes") and source and destination:
                 })
             route_info.append({"path":path,"segments":segments,"total_distance":round(total_distance,2)})
 
-        # Best route = lowest sum congestion %
         best_route = min(route_info,key=lambda x: sum([int(s['congestion'].split('%')[0]) for s in x['segments']]))
 
         for r in route_info:
